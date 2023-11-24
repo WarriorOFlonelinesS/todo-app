@@ -1,95 +1,69 @@
-import Image from 'next/image'
-import styles from './page.module.css'
+'use client'
+import { Loading } from './components/Loading'
+import { db } from '@/firebase'
+import { QueryClient, useQuery } from 'react-query'
+import 'firebase/firestore'
+import firebase from 'firebase/compat/app'
+import { ListTasks } from './ListTasks'
+import { useEffect, useState } from 'react'
+import { Button, Input, Flex, UnorderedList } from '@chakra-ui/react'
+import { TasksService } from '../services/DatabaseServices'
+
 
 export default function Home() {
+  const queryClient = new QueryClient()
+  const [task, setTask] = useState('')
+  const [todos, setTodos] = useState([])
+  const { data, status } = useQuery("tasks", TasksService.getAll);
+  const [loading, setLoading] = useState(true);
+
+
+  useEffect(() => {
+    if (status === 'success') {
+      db
+        .collection('tasks')
+        .orderBy('date', 'desc')
+        .onSnapshot(snapshot => {
+          setTodos(snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })))
+          setLoading(false);
+        });
+    }
+  }, [data]);
+  const sendData = async (task: string) => {
+    try {
+      // Добавление задачи в коллекцию "tasks"
+      await db.collection('tasks').add({
+        date: firebase.firestore.FieldValue.serverTimestamp(),
+        task: task,
+      });
+
+      queryClient.invalidateQueries('tasks');
+    } catch (error) {
+      console.error('Error adding task: ', error);
+    }
+  };
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>app/page.tsx</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+    <>
+      <Flex justifyContent='center' align='center'>
+        <Input w='100' onChange={(e) => { setTask(e.target.value) }}></Input>
+        <Button onClick={() => { sendData(task) }}>Add task</Button>
+      </Flex>
+      <Flex justifyContent='center' align='center'>
+        {loading ?
+          <Loading />
+          :
+          <UnorderedList>
+            {todos.map(item => {
 
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+              return (
+                <ListTasks item={item} />
+              )
+            })}
+          </UnorderedList>}
+      </Flex>
 
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore starter templates for Next.js.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    </>
   )
+
 }
+
